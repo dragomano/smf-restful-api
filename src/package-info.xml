@@ -21,6 +21,8 @@
 		<remove-dir name="$sourcedir/API" />
 		<remove-file name="$languagedir/API.english.php" />
 		<remove-file name="$languagedir/API.russian.php" />
+		<remove-file name="$themedir/API.template.php" />
+		<remove-file name="$themedir/css/api.css" />
 
 		<redirect url="?action=admin;area=packages;sa=browse" timeout="1000" />
 	</uninstall>

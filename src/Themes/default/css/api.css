@@ -1,0 +1,40 @@
+/* SMF RESTful API — responsive layout for the admin key editor. */
+@media (max-width: 767px) {
+	#api_keys_table thead {
+		display: none;
+	}
+
+	#api_keys_table tr {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px 8px;
+		padding: 8px;
+	}
+
+	#api_keys_table td {
+		display: block;
+		border: 0;
+		padding: 0;
+	}
+
+	/* First line: the token, spanning the full width. */
+	#api_keys_table td.api_cell_token {
+		flex: 1 0 100%;
+	}
+
+	#api_keys_table td.api_cell_token input {
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	/* Second line: member id on the left, action buttons on the right. */
+	#api_keys_table td.api_cell_member {
+		flex: 1 1 auto;
+	}
+
+	#api_keys_table td.api_cell_actions {
+		flex: 0 0 auto;
+		margin-left: auto;
+	}
+}
