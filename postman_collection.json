@@ -1,0 +1,863 @@
+{
+	"info": {
+		"_postman_id": "3f6c2e10-5a4b-4c2d-9e7a-1b2c3d4e5f60",
+		"name": "SMF RESTful API",
+		"description": "Collection for the SMF RESTful API mod (index.php?action=api).\n\nSet the collection variables `base_url` and `api_key` on the Variables tab. This collection is one end-to-end scenario: run it whole with Postman's Collection Runner (\"Run collection\") and it walks the full lifecycle in order - create category -> board -> topic -> reply, plus a throwaway member; inspects and edits each; then tears everything down child-first (post -> topic -> board -> category -> member).\n\nSAFETY: every editing/deleting request works only on data this run created. Each \"Create ...\" stores the new id into a collection variable (`category_id`, `board_id`, `member_id`, `topic_id`, `post_id`); Get/Update/Replace/Delete read that variable. The id variables start EMPTY and every mutating request has a pre-request guard that aborts the send if its id is still empty - so a delete can never hit a pre-existing forum item, even if a Create was skipped or failed. The api_key must belong to a member allowed to manage boards, moderate the forum and post.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "apikey",
+		"apikey": [
+			{ "key": "key", "value": "X-API-Key", "type": "string" },
+			{ "key": "value", "value": "{{api_key}}", "type": "string" },
+			{ "key": "in", "value": "header", "type": "string" }
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Unique letters-only suffix for names/emails, set fresh each request so",
+					"// re-runs never collide. Letters (not digits) on purpose: the forum may run",
+					"// the Username Validator mod, which restricts specific characters via",
+					"// uv_restricted_symbols (here the digit 5). Avoiding digits sidesteps it.",
+					"pm.collectionVariables.set('rand', Array.from({length: 12}, function () { return 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; }).join(''));"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"pm.test('Valid API response', function () {",
+					"    if (pm.response.code === 204) {",
+					"        // 204 No Content is the correct reply to a successful DELETE:",
+					"        // no body, and HTTP strips Content-Type since there is nothing to type.",
+					"        pm.expect(pm.response.text() || '', '204 must have an empty body').to.equal('');",
+					"    } else {",
+					"        pm.expect(pm.response.headers.get('Content-Type') || '', 'expected a JSON body').to.include('application/json');",
+					"    }",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{ "key": "base_url", "value": "https://smf21.local", "type": "string" },
+		{ "key": "api_key", "value": "your-api-key-here", "type": "string" },
+		{ "key": "category_id", "value": "", "type": "string" },
+		{ "key": "board_id", "value": "", "type": "string" },
+		{ "key": "member_id", "value": "", "type": "string" },
+		{ "key": "topic_id", "value": "", "type": "string" },
+		{ "key": "post_id", "value": "", "type": "string" },
+		{ "key": "rand", "value": "", "type": "string" }
+	],
+	"item": [
+		{
+			"name": "Categories",
+			"item": [
+				{
+					"name": "Create category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"if (j && j.data && j.data.id) {",
+									"    pm.collectionVariables.set('category_id', String(j.data.id));",
+									"    console.log('Saved category_id =', j.data.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"API test category {{rand}}\",\n  \"description\": \"Created via the API\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/categories",
+						"description": "Step 1. Create a category. Requires manage_boards. Saves the new id into category_id."
+					},
+					"response": []
+				},
+				{
+					"name": "Get category",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/categories/{{category_id}}",
+						"description": "The category just created (uses category_id)."
+					},
+					"response": []
+				},
+				{
+					"name": "List categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/categories&limit=25&offset=0",
+						"description": "Paginated list of categories that hold at least one visible board."
+					},
+					"response": []
+				},
+				{
+					"name": "Update category (PATCH)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('category_id')) {",
+									"    throw new Error('category_id is empty - run \"Create category\" first. Refusing to touch an existing forum category.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"description\": \"Only the fields you send are changed\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/categories/{{category_id}}",
+						"description": "Partially update the created category. Requires manage_boards."
+					},
+					"response": []
+				},
+				{
+					"name": "Replace category (PUT)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('category_id')) {",
+									"    throw new Error('category_id is empty - run \"Create category\" first. Refusing to touch an existing forum category.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Renamed API category\",\n  \"description\": \"Both fields are required for PUT\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/categories/{{category_id}}",
+						"description": "Fully replace the created category's editable fields. Requires manage_boards."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Boards",
+			"item": [
+				{
+					"name": "Create board",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('category_id')) {",
+									"    throw new Error('category_id is empty - run \"Create category\" first so the board lands in a collection-made category.');",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"if (j && j.data && j.data.id) {",
+									"    pm.collectionVariables.set('board_id', String(j.data.id));",
+									"    console.log('Saved board_id =', j.data.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"category\": {{category_id}},\n  \"name\": \"API test board {{rand}}\",\n  \"description\": \"Created via the API\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/boards",
+						"description": "Step 2. Create a board inside the created category. Requires manage_boards. Saves the new id into board_id."
+					},
+					"response": []
+				},
+				{
+					"name": "Get board",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/boards/{{board_id}}",
+						"description": "The board just created (uses board_id)."
+					},
+					"response": []
+				},
+				{
+					"name": "List boards",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/boards&limit=25&offset=0",
+						"description": "Paginated list of boards the API user may see."
+					},
+					"response": []
+				},
+				{
+					"name": "List boards in category",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('category_id')) {",
+									"    throw new Error('category_id is empty - run \"Create category\" first.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/categories/{{category_id}}/boards&limit=25&offset=0",
+						"description": "Nested route: boards in the created category (v1/categories/{id}/boards). Should include the board created above."
+					},
+					"response": []
+				},
+				{
+					"name": "Update board (PATCH)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('board_id')) {",
+									"    throw new Error('board_id is empty - run \"Create board\" first. Refusing to touch an existing forum board.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"description\": \"Only the fields you send are changed\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/boards/{{board_id}}",
+						"description": "Partially update the created board. Send an optional \"category\" to move it. Requires manage_boards."
+					},
+					"response": []
+				},
+				{
+					"name": "Replace board (PUT)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('board_id')) {",
+									"    throw new Error('board_id is empty - run \"Create board\" first. Refusing to touch an existing forum board.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Renamed API board\",\n  \"description\": \"Both fields are required for PUT\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/boards/{{board_id}}",
+						"description": "Fully replace the created board's editable fields. Requires manage_boards."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Members",
+			"item": [
+				{
+					"name": "Create member",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"if (j && j.data && j.data.id) {",
+									"    pm.collectionVariables.set('member_id', String(j.data.id));",
+									"    console.log('Saved member_id =', j.data.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"apiuser{{rand}}\",\n  \"email\": \"apiuser{{rand}}@example.com\",\n  \"password\": \"ChangeMe123!\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/members",
+						"description": "Create a throwaway member with a unique username/email. Requires moderate_forum. Saves the new id into member_id."
+					},
+					"response": []
+				},
+				{
+					"name": "Get member",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/members/{{member_id}}",
+						"description": "The member just created (uses member_id). The email field is only returned to admins."
+					},
+					"response": []
+				},
+				{
+					"name": "List members",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/members&limit=25&offset=0",
+						"description": "Paginated member list. Requires the view_mlist permission."
+					},
+					"response": []
+				},
+				{
+					"name": "Update member (PATCH)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('member_id')) {",
+									"    throw new Error('member_id is empty - run \"Create member\" first. Refusing to touch an existing forum member.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Renamed via PATCH\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/members/{{member_id}}",
+						"description": "Partially update the created member. Needs profile_identity_any (profile_identity_own for yourself)."
+					},
+					"response": []
+				},
+				{
+					"name": "Replace member (PUT)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('member_id')) {",
+									"    throw new Error('member_id is empty - run \"Create member\" first. Refusing to touch an existing forum member.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"New display name\",\n  \"email\": \"apiuser.updated{{rand}}@example.com\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/members/{{member_id}}",
+						"description": "Fully replace the created member's editable profile (name and email both required)."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Topics",
+			"item": [
+				{
+					"name": "Create topic",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('board_id')) {",
+									"    throw new Error('board_id is empty - run \"Create board\" first so the topic lands in a collection-made board.');",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"if (j && j.data && j.data.id) {",
+									"    pm.collectionVariables.set('topic_id', String(j.data.id));",
+									"    console.log('Saved topic_id =', j.data.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"board\": {{board_id}},\n  \"subject\": \"API test topic {{rand}}\",\n  \"body\": \"Hello from the API\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/topics",
+						"description": "Step 3. Create a topic in the created board. Requires post_new (or post_unapproved_topics). Saves the new id into topic_id."
+					},
+					"response": []
+				},
+				{
+					"name": "Get topic",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/topics/{{topic_id}}",
+						"description": "The topic just created (uses topic_id)."
+					},
+					"response": []
+				},
+				{
+					"name": "List topics in board",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('board_id')) {",
+									"    throw new Error('board_id is empty - run \"Create board\" first.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/boards/{{board_id}}/topics&limit=25&offset=0",
+						"description": "Nested route: topics in the created board. Parent id is in the path (v1/boards/{id}/topics), never a query param. GET /topics lists across all boards."
+					},
+					"response": []
+				},
+				{
+					"name": "Update topic (PATCH)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('topic_id')) {",
+									"    throw new Error('topic_id is empty - run \"Create topic\" first. Refusing to touch an existing forum topic.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"locked\": true\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/topics/{{topic_id}}",
+						"description": "Partially update the created topic (here: lock it). Each field needs its own permission (modify, lock, make_sticky)."
+					},
+					"response": []
+				},
+				{
+					"name": "Replace topic (PUT)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('topic_id')) {",
+									"    throw new Error('topic_id is empty - run \"Create topic\" first. Refusing to touch an existing forum topic.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"subject\": \"Updated subject\",\n  \"locked\": false,\n  \"sticky\": false\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/topics/{{topic_id}}",
+						"description": "Fully set the created topic's editable fields (subject, locked, sticky all required). Unlocks it again so the reply below can be posted."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Posts",
+			"item": [
+				{
+					"name": "Create reply",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('topic_id')) {",
+									"    throw new Error('topic_id is empty - run \"Create topic\" first so the reply lands in a collection-made topic.');",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"if (j && j.data && j.data.id) {",
+									"    pm.collectionVariables.set('post_id', String(j.data.id));",
+									"    console.log('Saved post_id =', j.data.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"topic\": {{topic_id}},\n  \"body\": \"A reply posted via the API\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/posts",
+						"description": "Step 4. Post a reply to the created topic. Requires reply permissions on the board. Saves the new message id into post_id (a reply, so editing/deleting it never removes the topic)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get post",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/posts/{{post_id}}",
+						"description": "The reply just created (uses post_id), with parsed and raw body."
+					},
+					"response": []
+				},
+				{
+					"name": "List posts in topic",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('topic_id')) {",
+									"    throw new Error('topic_id is empty - run \"Create topic\" first.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/topics/{{topic_id}}/posts&limit=25&offset=0",
+						"description": "Nested route: all posts of the created topic (v1/topics/{id}/posts) - the opening post plus the reply."
+					},
+					"response": []
+				},
+				{
+					"name": "Edit post (PUT/PATCH)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('post_id')) {",
+									"    throw new Error('post_id is empty - run \"Create reply\" first. Refusing to touch an existing forum post.');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"body\": \"Edited via the API\",\n  \"reason\": \"typo\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/index.php?action=api&path=v1/posts/{{post_id}}",
+						"description": "Edit the created reply. \"body\" is required; \"subject\" and \"reason\" are optional. Needs modify_own (within the time limit) or modify_any. PATCH behaves the same."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Teardown (child -> parent)",
+			"item": [
+				{
+					"name": "Delete post",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('post_id')) {",
+									"    throw new Error('post_id is empty - run \"Create reply\" first. Refusing to delete an existing forum post.');",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.collectionVariables.set('post_id', '');"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/posts/{{post_id}}",
+						"description": "Delete the created reply. Since post_id is a reply (not the opening post), the topic stays. Clears post_id."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete topic",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('topic_id')) {",
+									"    throw new Error('topic_id is empty - run \"Create topic\" first. Refusing to delete an existing forum topic.');",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.collectionVariables.set('topic_id', '');",
+									"pm.collectionVariables.set('post_id', '');"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/topics/{{topic_id}}",
+						"description": "Delete the created topic (and any remaining replies). Needs remove_own/remove_any. Honours the recycle bin. Clears topic_id and post_id."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete board",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('board_id')) {",
+									"    throw new Error('board_id is empty - run \"Create board\" first. Refusing to delete an existing forum board.');",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.collectionVariables.set('board_id', '');"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/boards/{{board_id}}",
+						"description": "Delete the created board (now empty). Add &move_children_to=<id> to relocate child boards instead. Clears board_id."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete category",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('category_id')) {",
+									"    throw new Error('category_id is empty - run \"Create category\" first. Refusing to delete an existing forum category.');",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.collectionVariables.set('category_id', '');"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/categories/{{category_id}}",
+						"description": "Delete the created category (now empty). Add &move_boards_to=<id> to relocate remaining boards instead. Clears category_id."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete member",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (!pm.collectionVariables.get('member_id')) {",
+									"    throw new Error('member_id is empty - run \"Create member\" first. Refusing to delete an existing forum member.');",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.collectionVariables.set('member_id', '');"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "{{base_url}}/index.php?action=api&path=v1/members/{{member_id}}",
+						"description": "Delete the throwaway member. Needs profile_remove_any (profile_remove_own for yourself); only admins may delete admins. Clears member_id."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

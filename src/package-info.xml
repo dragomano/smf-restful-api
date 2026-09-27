@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!DOCTYPE package-info SYSTEM "http://www.simplemachines.org/xml/package-info">
+<package-info xmlns="http://www.simplemachines.org/xml/package-info" xmlns:smf="http://www.simplemachines.org/">
+	<id>Bugo:SMF_RESTFUL_API</id>
+	<name>SMF RESTful API</name>
+	<version>0.1</version>
+	<type>modification</type>
+
+	<install for="2.1.*">
+		<hook hook="integrate_pre_load" function="SMF\API\Integration::hooks#" file="$sourcedir/API/Integration.php" />
+
+		<require-dir name="Sources" destination="$boarddir" />
+		<require-dir name="Themes" destination="$boarddir" />
+
+		<redirect url="?action=admin;area=modsettings;sa=api" timeout="2000" />
+	</install>
+
+	<uninstall for="2.1.*">
+		<hook hook="integrate_pre_load" function="SMF\API\Integration::hooks#" file="$sourcedir/API/Integration.php" reverse="true" />
+
+		<remove-dir name="$sourcedir/API" />
+		<remove-file name="$languagedir/API.english.php" />
+		<remove-file name="$languagedir/API.russian.php" />
+
+		<redirect url="?action=admin;area=packages;sa=browse" timeout="1000" />
+	</uninstall>
+</package-info>
