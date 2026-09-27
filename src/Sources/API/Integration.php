@@ -26,15 +26,15 @@ class Integration
 {
 	public function hooks(): void
 	{
-		add_integration_function('integrate_autoload', self::class . '::autoload#', false, __FILE__);
-		add_integration_function('integrate_actions', self::class . '::actions#', false, __FILE__);
-		add_integration_function('integrate_admin_areas', self::class . '::adminAreas#', false, __FILE__);
-		add_integration_function('integrate_admin_search', self::class . '::adminSearch#', false, __FILE__);
-		add_integration_function('integrate_modify_modifications', self::class . '::modifyModifications#', false, __FILE__);
+		add_integration_function('integrate_autoload', self::class . '::autoload#', false);
+		add_integration_function('integrate_actions', self::class . '::actions#', false);
+		add_integration_function('integrate_admin_areas', self::class . '::adminAreas#', false);
+		add_integration_function('integrate_admin_search', self::class . '::adminSearch#', false);
+		add_integration_function('integrate_modify_modifications', self::class . '::modifyModifications#', false);
 
 		// When the Merge Double Posts mod is installed, keep its browser-only
 		// redirect out of the API flow (see suppressPostMerge()).
-		add_integration_function('integrate_mdp_create_post', self::class . '::suppressPostMerge#', false, __FILE__);
+		add_integration_function('integrate_mdp_create_post', self::class . '::suppressPostMerge#', false);
 	}
 
 	/**
@@ -161,9 +161,10 @@ class Integration
 		if (isset($_GET['save'])) {
 			checkSession();
 
-			$this->saveSettings();
-
-			redirectexit('action=admin;area=modsettings;sa=api');
+			// Only redirect on a clean save; malformed rows keep us on the page.
+			if ($this->saveSettings()) {
+				redirectexit('action=admin;area=modsettings;sa=api');
+			}
 		}
 	}
 
@@ -192,17 +193,22 @@ class Integration
 
 	/**
 	 * Persist the enable switch and rebuild the token => member map from the
-	 * table rows, rejecting malformed input so a typo can never lock everyone
-	 * out silently.
+	 * table rows. Valid rows are always saved; malformed ones are reported and
+	 * the submitted input is kept so a typo can never lock everyone out silently.
+	 *
+	 * @return bool True on a clean save, false when some rows were rejected.
 	 */
-	private function saveSettings(): void
+	private function saveSettings(): bool
 	{
-		global $txt;
+		global $context, $txt;
 
 		$tokens  = (array) ($_POST['api_key_token'] ?? []);
 		$members = (array) ($_POST['api_key_member'] ?? []);
 
-		$map = [];
+		$map     = [];
+		$rows    = [];
+		$invalid = false;
+
 		foreach ($tokens as $i => $token) {
 			$token    = trim((string) $token);
 			$idMember = (int) ($members[$i] ?? 0);
@@ -212,8 +218,12 @@ class Integration
 				continue;
 			}
 
+			// Preserve the submitted row so a reload keeps what the admin typed.
+			$rows[] = ['token' => $token, 'member' => $idMember];
+
 			if ($token === '' || $idMember <= 0) {
-				fatal_error($txt['api_keys_invalid'], false);
+				$invalid = true;
+				continue;
 			}
 
 			$map[$token] = $idMember;
@@ -223,5 +233,15 @@ class Integration
 			'api_enabled' => empty($_POST['api_enabled']) ? 0 : 1,
 			'api_keys'    => json_encode($map),
 		]);
+
+		// Some rows were malformed: stay on the page, flag them and keep the input.
+		if ($invalid) {
+			$context['error_message'] = $txt['api_keys_invalid'];
+			$context['api_keys']      = $rows;
+
+			return false;
+		}
+
+		return true;
 	}
 }

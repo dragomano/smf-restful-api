@@ -194,23 +194,57 @@ final class IntegrationTest
         Assert::same($GLOBALS['api_updated_settings']['api_keys'], json_encode(['token-b' => 9]));
     }
 
-    public function settingsRejectsAkeyRowMissingItsMember(): void
+    public function settingsReportsAkeyRowMissingItsMemberWithoutRedirecting(): void
     {
         Environment::reset();
         $_GET['save'] = '';
         $_POST['api_key_token']  = ['token-a'];
-        // No member value at all → falls back to the default 0 → rejected.
+        // No member value at all → falls back to the default 0 → the row is flagged.
         $_POST['api_key_member'] = [];
 
-        $caught = null;
+        $threw = false;
 
         try {
             (new Integration())->settings();
-        } catch (\RuntimeException $exception) {
-            $caught = $exception->getMessage();
+        } catch (\RuntimeException) {
+            $threw = true;
         }
 
-        Assert::same($caught, 'fatal:Invalid API keys');
+        // Neither a redirect nor a fatal: the admin stays on the settings page.
+        Assert::false($threw);
+        // The malformed row is reported and the submitted input is preserved.
+        Assert::same($GLOBALS['context']['error_message'], 'Invalid API keys');
+        Assert::same($GLOBALS['context']['api_keys'], [
+            ['token' => 'token-a', 'member' => 0],
+        ]);
+        // No valid rows here, so the stored map ends up empty.
+        Assert::same($GLOBALS['api_updated_settings']['api_keys'], json_encode([]));
+    }
+
+    public function settingsStillSavesTheValidRowsWhenAnotherRowIsInvalid(): void
+    {
+        Environment::reset();
+        $_GET['save'] = '';
+        // First row is valid, second is missing its member: the valid one is
+        // persisted, the bad one is reported without discarding everything.
+        $_POST['api_key_token']  = ['token-a', 'token-b'];
+        $_POST['api_key_member'] = ['5', ''];
+
+        $threw = false;
+
+        try {
+            (new Integration())->settings();
+        } catch (\RuntimeException) {
+            $threw = true;
+        }
+
+        Assert::false($threw);
+        Assert::same($GLOBALS['api_updated_settings']['api_keys'], json_encode(['token-a' => 5]));
+        Assert::same($GLOBALS['context']['error_message'], 'Invalid API keys');
+        Assert::same($GLOBALS['context']['api_keys'], [
+            ['token' => 'token-a', 'member' => 5],
+            ['token' => 'token-b', 'member' => 0],
+        ]);
     }
 
     public function suppressPostMergeZeroesTheLastMessageForApiRequests(): void
