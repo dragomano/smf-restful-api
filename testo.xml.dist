@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Placeholder for Infection, not a real Testo config.
+
+    Infection's TestFrameworkConfigLocator insists on finding a
+    "<framework>.{xml,yml,xml.dist,...}" file for every adapter — including
+    "testo" — before it will build the adapter (see Infection's
+    TestFramework/Factory::create()). The testo/bridge-infection adapter never
+    reads this path (the real configuration lives in testo.php), so an empty
+    file is enough to satisfy the lookup and let mutation testing run.
+-->
+<testo/>

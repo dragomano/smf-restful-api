@@ -1,0 +1,44 @@
+{
+    "autoload": {
+        "psr-4": {
+            "SMF\\API\\": "src\\Sources\\API"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests"
+        }
+    },
+    "require": {
+        "php": "^8.2"
+    },
+    "require-dev": {
+        "infection/infection": "^0.32.6",
+        "rector/rector": "^2.6",
+        "testo/bridge-infection": "^0.1.8",
+        "testo/testo": "^0.10"
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "8.2"
+        },
+        "allow-plugins": {
+            "infection/extension-installer": true
+        }
+    },
+    "scripts": {
+        "check": "vendor/bin/rector process --dry-run --clear-cache",
+        "rector": "vendor/bin/rector process",
+        "test": "vendor/bin/testo",
+        "test:mutate": [
+            "Composer\\Config::disableProcessTimeout",
+            "@putenv INFECTION_ALLOW_XDEBUG=1",
+            "@php -d auto_prepend_file=tests/infection-bootstrap.php vendor/bin/infection --threads=max"
+        ],
+        "test:coverage": "vendor/bin/testo --coverage"
+    },
+    "scripts-descriptions": {
+        "test:mutate": "Run Infection mutation testing over the Testo suite"
+    }
+}
