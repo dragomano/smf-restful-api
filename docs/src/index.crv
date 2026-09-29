@@ -1,0 +1,39 @@
+---
+title: SMF RESTful API
+description: RESTful JSON API for SMF 2.1 — full-featured REST interface with authentication, pagination, and hook-based extensibility.
+layout: home
+hero:
+  name: SMF RESTful API
+  text: RESTful JSON API for SMF 2.1
+  tagline: A hooks-only SMF modification that exposes categories, members, boards, topics, and posts over a REST interface with proper permission checks.
+  actions:
+    - theme: brand
+      text: Get Started
+      link: /guide/getting-started
+    - theme: alt
+      text: Extending the API
+      link: /guide/extending/overview
+features:
+  - title: Hooks only
+    details: "No core file edits. The mod registers index.php?action=api and delegates to its own router — keys are managed at Admin → Modification Settings → RESTful API."
+  - title: Full resource coverage
+    details: "Categories, members, boards, topics, and posts with GET/POST/PUT/PATCH/DELETE. Reads use a Query builder with {query_see_board} and pagination; writes use SMF native functions."
+  - title: SMF-native authentication
+    details: "API key via Authorization: Bearer, X-API-Key, or api_key parameter. After authentication the full SMF user context ($user_info, allowedTo(), {query_see_board}) is restored."
+  - title: Clean URLs optional
+    details: "Reach the API at index.php?action=api;path=v1/members/5 or via rewrites as /api/v1/members/5. Apache and Nginx rules are included."
+  - title: Extensible via hooks
+    details: "Third-party mods register routes and authentication schemes and tweak responses through integrate_api_* hooks — no need to patch this mod."
+  - title: Validated builds
+    details: "Documentation is built with CarvePress — .crv sources, build-time link validation, and localized English/Russian output."
+---
+
+# SMF RESTful API
+
+*SMF RESTful API* is a modification for [SMF 2.1](https://github.com/SimpleMachines/SMF2.1) that layers a full-featured REST interface with JSON responses on top of the engine. The mod registers a single action, `index.php?action=api`, and passes the request to its own router. A resource is addressed as `index.php?action=api;path=v1/members/5`, or, with a rewrite rule in place, as `/api/v1/members/5`.
+
+Use [Getting Started](/guide/getting-started) for the overview, [Clean URLs](/guide/clean-urls) for rewrite rules, and [Extending the API](/guide/extending/overview) for integration hooks.
+
+::: note "Repository"
+Source code and issue tracker: [github.com/dragomano/smf-restful-api](https://github.com/dragomano/smf-restful-api).
+:::

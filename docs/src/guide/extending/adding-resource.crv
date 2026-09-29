@@ -1,0 +1,119 @@
+---
+title: Adding a Resource
+description: Step-by-step guide to adding a custom widgets resource — mod entry point, route registration, controller, and reserved parameter pitfalls.
+order: 2
+---
+
+# Adding a New Resource
+
+Below is a minimal mod that adds a `widgets` resource.
+
+## 1. Mod entry point
+
+```php "Integration.php"
+<?php
+
+namespace Vendor\Widgets;
+
+if (! defined('SMF'))
+	die('No direct access...');
+
+class Integration
+{
+	public function hooks(): void
+	{
+		// Your own autoloader, so SMF can find the mod's classes.
+		add_integration_function('integrate_autoload', self::class . '::autoload#', false, __FILE__);
+		add_integration_function('integrate_api_routes', self::class . '::routes#', false, __FILE__);
+	}
+
+	public function autoload(array &$classMap): void
+	{
+		$classMap['Vendor\\Widgets\\'] = 'Widgets/';
+	}
+
+	// routes() is shown in the next section
+}
+```
+
+## 2. Registering routes
+
+The `integrate_api_routes` handler receives a `Router` object with the fluent methods `get()`, `post()`, `put()`, `patch()`, `delete()`. The `{id}` segment (or any `{name}`) is placed into the action's parameter array.
+
+```php "routes"
+public function routes(\SMF\API\Router $router): void
+{
+	$router->get('widgets', WidgetController::class, 'index');
+	$router->get('widgets/{id}', WidgetController::class, 'show');
+	$router->post('widgets', WidgetController::class, 'store');
+}
+```
+
+::: note "Version prefix"
+Routes are registered *without* a version prefix. The leading version segment (`v1`) is stripped and validated by the `Router` itself, so the patterns stay version-agnostic. The client addresses the resource as `index.php?action=api&path=v1/widgets`.
+:::
+
+::: warning "Nested collections and reserved parameters"
+Register "child" lists under the parent — `parent/{parent_id}/children`, not through a query filter. Examples from the core API: `GET boards/{board_id}/topics`, `GET categories/{cat_id}/boards`, `GET topics/{topic_id}/posts`. The reason is not just style: the names `board`, `topic`, `msg`, `start`, `action` are *SMF's reserved query parameters*. If you pass `?board=5`, the core will treat the request as a board view during `loadBoard()` and return an HTML page — it will never reach `action=api`. The parent identifier in the path (`{parent_id}`) avoids this collision; read it with `$this->id($params, 'parent_id')`.
+:::
+
+## 3. Controller
+
+The controller extends `SMF\API\Controllers\AbstractController` and gets a ready-made "harness": access to the request, a response factory, the `Query` builder, pagination, and id validation.
+
+```php "WidgetController.php"
+<?php
+
+namespace Vendor\Widgets;
+
+use SMF\API\ApiException;
+use SMF\API\Query;
+use SMF\API\Response;
+use SMF\API\Controllers\AbstractController;
+
+if (! defined('SMF'))
+	die('No direct access...');
+
+class WidgetController extends AbstractController
+{
+	public function index(array $params): Response
+	{
+		$query = (new Query())
+			->from('{db_prefix}widgets AS w')
+			->where('w.hidden = {int:hidden}')
+			->columns('w.id_widget, w.name')
+			->orderBy('w.name')
+			->params(['hidden' => 0]);
+
+		// Every row passes through transform(); a collection with pagination meta is returned.
+		return $this->paginate($query);
+	}
+
+	public function show(array $params): Response
+	{
+		$row = $this->first(
+			(new Query())
+				->from('{db_prefix}widgets')
+				->where('id_widget = {int:id}')
+				->columns('id_widget, name')
+				->params(['id' => $this->id($params)]) // id($params) validates {id}
+		);
+
+		if ($row === null) {
+			throw ApiException::notFound('Widget not found');
+		}
+
+		return $this->response()->data($this->transform($row));
+	}
+
+	protected function transform(array $row): array
+	{
+		return [
+			'id'   => (int) $row['id_widget'],
+			'name' => $row['name'],
+		];
+	}
+}
+```
+
+See [Query & Controller](/guide/extending/query) for the full reference of `Query` and `AbstractController` helpers.

@@ -1,0 +1,41 @@
+---
+title: Свои схемы аутентификации
+description: Подключение собственной аутентификации через integrate_api_authenticate — например OAuth/JWT — выставлением $idMember.
+order: 4
+---
+
+{#Custom-Authentication-Schemes}
+# Свои схемы аутентификации
+
+Зарегистрируйте обработчик `integrate_api_authenticate`, чтобы добавить свою схему. Если `$idMember` остался `null`, применяется штатная проверка ключей. Заданный `$idMember` всё равно проходит проверку активации аккаунта и получает полный контекст прав SMF.
+
+```php "authenticate"
+public function authenticate(\SMF\API\Request $request, ?int &$idMember): void
+{
+	$token = $request->header('x-my-oauth');
+
+	if (! empty($token)) {
+		$idMember = my_resolve_oauth_to_member((string) $token);
+	}
+}
+```
+
+{#Where-this-fits-in-the-request-lifecycle}
+## Место в жизненном цикле запроса
+
+1. Парсится запрос (`Request`).
+2. Выполняются хуки `integrate_api_pre_dispatch` (лимиты, CORS-preflight).
+3. Аутентификация: сначала все обработчики `integrate_api_authenticate`, затем штатная проверка API-ключа, если `$idMember` всё ещё `null`.
+4. Роутер передаёт управление контроллеру.
+
+{#Native-API-key-sources-when-no-custom-id-is-set}
+## Штатные источники API-ключа (когда кастомный id не выставлен)
+
+Встроенный аутентификатор принимает ключ из `Authorization: Bearer <key>`, заголовка `X-API-Key` или параметра запроса `api_key`. После аутентификации восстанавливается полный контекст пользователя SMF (`$user_info`, `allowedTo()`, `{query_see_board}`).
+
+{#Tips}
+## Рекомендации
+
+- Преобразуйте токен в целочисленный id пользователя только если смогли его проверить; иначе оставляйте `$idMember` как `null` для fallback.
+- Не выставляйте id для неактивного или забаненного аккаунта — проверка ядра всё равно его отклонит.
+- Делайте обработчик быстрым — он выполняется на каждом запросе к API.

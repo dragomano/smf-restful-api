@@ -1,0 +1,40 @@
+---
+title: SMF RESTful API
+description: RESTful JSON API для SMF 2.1 — полноценный REST-интерфейс с аутентификацией, пагинацией и расширяемостью через хуки.
+layout: home
+hero:
+  name: SMF RESTful API
+  text: RESTful JSON API для SMF 2.1
+  tagline: Модификация SMF без правок файлов ядра, которая отдаёт категории, пользователей, разделы, темы и сообщения через REST с корректными проверками прав.
+  actions:
+    - theme: brand
+      text: Начало работы
+      link: /ru/guide/getting-started
+    - theme: alt
+      text: Расширение API
+      link: /ru/guide/extending/overview
+features:
+  - title: Только хуки
+    details: "Без правок ядра. Мод регистрирует index.php?action=api и делегирует собственному роутеру — ключи настраиваются в «Админка → Настройки модов → RESTful API»."
+  - title: Полный набор ресурсов
+    details: "Категории, пользователи, разделы, темы и сообщения с GET/POST/PUT/PATCH/DELETE. Чтение через Query с {query_see_board} и пагинацией; запись через штатные функции SMF."
+  - title: Аутентификация как в SMF
+    details: "API-ключ через Authorization: Bearer, X-API-Key или параметр api_key. После аутентификации восстанавливается полный контекст пользователя SMF ($user_info, allowedTo(), {query_see_board})."
+  - title: Чистые URL опционально
+    details: "Обращение как index.php?action=api;path=v1/members/5 или через rewrite как /api/v1/members/5. Правила для Apache и Nginx прилагаются."
+  - title: Расширяемость через хуки
+    details: "Сторонние моды регистрируют маршруты, схемы аутентификации и правят ответы через хуки integrate_api_* без патчей этого мода."
+  - title: Проверяемая документация
+    details: "Документация собирается CarvePress — .crv-исходники, валидация ссылок при сборке и локализация на английский/русский."
+---
+
+{#SMF-RESTful-API}
+# SMF RESTful API
+
+*SMF RESTful API* — модификация для форума [SMF 2.1](https://github.com/SimpleMachines/SMF2.1), добавляющая поверх движка полноценный REST-интерфейс с ответами в формате JSON. Мод регистрирует единственное действие `index.php?action=api` и передаёт запрос собственному маршрутизатору. Обращение к ресурсу выглядит как `index.php?action=api;path=v1/members/5`, а при настроенном правиле перезаписи — как `/api/v1/members/5`.
+
+Начните с раздела [Начало работы](/ru/guide/getting-started), затем см. [Чистые URL](/ru/guide/clean-urls) и [Расширение API](/ru/guide/extending/overview).
+
+::: note "Репозиторий"
+Исходники и трекер задач: [github.com/dragomano/smf-restful-api](https://github.com/dragomano/smf-restful-api).
+:::

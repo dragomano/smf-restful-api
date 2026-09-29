@@ -1,0 +1,10 @@
+/* Compact tab stops in code blocks: browsers default to 8, which reads huge next to 4-space samples. */
+.content pre {
+  tab-size: 4;
+}
+
+/* Wrap long code lines instead of scrolling horizontally. */
+.content pre code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

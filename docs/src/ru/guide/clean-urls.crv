@@ -1,0 +1,37 @@
+---
+title: Чистые URL
+description: Опциональные правила перезаписи для коротких URL /api/* на Apache и Nginx; прямой адрес index.php?action=api;path=... работает всегда.
+order: 2
+---
+
+{#Clean-URLs-rewrite-rules}
+# Чистые URL (правила перезаписи)
+
+Правила перезаписи не обязательны: API всегда доступен по «прямому» адресу `index.php?action=api;path=v1/members/5`. Правила лишь превращают его в короткий `/api/v1/members/5`. Ведущий сегмент `api` мод снимает сам, поэтому запрос уходит в `index.php?action=api` с путём в параметре `path`; остальные query-параметры (например, `?limit=25&offset=50`) при этом сохраняются.
+
+{#Apache-htaccess-in-the-forum-root}
+## Apache (.htaccess в корне форума)
+
+```apache ".htaccess"
+RewriteEngine On
+# /api/v1/members/5  ->  index.php?action=api;path=v1/members/5
+RewriteRule ^api/(.*)$ index.php?action=api;path=$1 [QSA,L]
+```
+
+Флаг `QSA` дописывает исходную строку запроса, поэтому фильтры и пагинация продолжают работать. Если форум установлен в подкаталоге, добавьте перед правилом `RewriteBase` — например, `RewriteBase /forum/`.
+
+{#Nginx}
+## Nginx
+
+```nginx "nginx.conf"
+# /api/v1/members/5  ->  index.php?action=api;path=v1/members/5
+location ^~ /api/ {
+    rewrite ^/api/(.*)$ /index.php?action=api;path=$1 last;
+}
+```
+
+Модификатор `^~` даёт этому блоку приоритет над общим `location ~ \.php$` (порядок описания при этом не важен), а сам `/index.php` затем обрабатывается штатным PHP-location форума. Nginx автоматически дописывает исходные query-параметры к цели `rewrite`.
+
+::: tip "Прямой адрес работает всегда"
+Правила перезаписи можно не настраивать и использовать `index.php?action=api;path=v1/members/5` (или `index.php?action=api&path=v1/members/5` в зависимости от стиля разделителя).
+:::

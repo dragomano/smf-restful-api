@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://dragomano.github.io/smf-restful-api/sitemap.xml

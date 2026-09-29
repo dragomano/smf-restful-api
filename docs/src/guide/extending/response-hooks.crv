@@ -1,0 +1,39 @@
+---
+title: Response & Request Hooks
+description: Adjusting responses via integrate_api_pre_send (CORS, wrappers, rate-limit headers) and intercepting requests via integrate_api_pre_dispatch with ApiException.
+order: 5
+---
+
+# Adjusting the Response & Request
+
+## Adjusting the response (for example, CORS)
+
+Use `integrate_api_pre_send`. It fires before the response is sent and lets you adjust the body, status, and headers — for CORS, rate-limit headers, or envelope wrappers.
+
+```php "preSend"
+public function preSend(array &$payload, int &$status, array &$headers): void
+{
+	$headers['Access-Control-Allow-Origin'] = '*';
+}
+```
+
+Parameters are passed by reference:
+
+- `&$payload` — the JSON body array that will be encoded.
+- `&$status` — the HTTP status code.
+- `&$headers` — the response headers array (header name → value).
+
+## Adjusting the request before routing
+
+Use `integrate_api_pre_dispatch`. It fires after the request is parsed but before authentication — good for global logic like throttling or CORS preflight. Throw an `ApiException` to abort the request with a JSON error.
+
+```php "preDispatch"
+public function preDispatch(\SMF\API\Request $request): void
+{
+	if (my_rate_limit_exceeded($request)) {
+		throw new \SMF\API\ApiException(429, 'Too many requests', 'too_many_requests');
+	}
+}
+```
+
+`ApiException` takes an HTTP status, a human-readable message, and an optional machine-readable error code (third argument). Authentication and routing are skipped when this exception is thrown.

@@ -1,0 +1,11 @@
+{
+  "type": "module",
+  "scripts": {
+    "docs:dev": "carve-press dev",
+    "docs:build": "carve-press build",
+    "docs:preview": "carve-press serve"
+  },
+  "devDependencies": {
+    "@markup-carve/carve-press": "^0.1.3"
+  }
+}

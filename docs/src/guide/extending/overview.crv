@@ -1,0 +1,29 @@
+---
+title: Extending — Overview & Hooks
+description: How third-party mods extend the API via SMF integration hooks without patching this mod; hook reference table and design notes.
+order: 1
+---
+
+# Extending SMF RESTful API — Overview & Hooks
+
+The API is designed so that third-party mods can add their own resources and influence request handling through SMF's standard integration hooks — without modifying this mod's files.
+
+## Available hooks
+
+{header-rows=0}
+|= *`integrate_api_routes`* (`Router $router`) | < |
+| Register your own endpoints | Fires when the router is initialized |
+|= *`integrate_api_pre_dispatch`* (`Request $request`) | < |
+| Global logic (throttling, CORS preflight); may throw `ApiException` | Fires after the request is parsed, before authentication |
+|= *`integrate_api_authenticate`* (`Request $request`, `?int &$idMember`) | < |
+| Your own schemes (OAuth/JWT): set `$idMember` | Fires at the start of authentication |
+|= *`integrate_api_pre_send`* (`array &$payload`, `int &$status`, `array &$headers`) | < |
+| Adjust the body, status, and headers (CORS, rate limiting, wrappers) | Fires before the response is sent |
+
+## Where hooks come from
+
+All four hooks are standard SMF `integrate_*` hooks registered via `add_integration_function()`. Your mod's `Integration::hooks()` registers them the same way SMF itself does — see [Adding a Resource](/guide/extending/adding-resource).
+
+## Version prefix and route style
+
+Routes are registered *without* a version prefix. The leading version segment (`v1`) is stripped and validated by the `Router` itself, so patterns stay version-agnostic. The client addresses the resource as `index.php?action=api&path=v1/widgets`. See [Adding a Resource](/guide/extending/adding-resource) for the nested collection rule and reserved parameter names.

@@ -1,10 +1,9 @@
 **/.idea/
 **/.vscode/
 **/vendor/
-
 coverage/
-
 clover.xml
 cobertura.xml
-
 composer.lock
+dist/
+node_modules/

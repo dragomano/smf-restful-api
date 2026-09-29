@@ -1,0 +1,37 @@
+---
+title: Custom Authentication
+description: How to plug in your own authentication via integrate_api_authenticate — e.g. OAuth/JWT — by setting $idMember.
+order: 4
+---
+
+# Custom Authentication Schemes
+
+Register an `integrate_api_authenticate` handler to add your own scheme. If `$idMember` stays `null`, the native key check applies. A set `$idMember` still goes through the account activation check and receives the full SMF permission context.
+
+```php "authenticate"
+public function authenticate(\SMF\API\Request $request, ?int &$idMember): void
+{
+	$token = $request->header('x-my-oauth');
+
+	if (! empty($token)) {
+		$idMember = my_resolve_oauth_to_member((string) $token);
+	}
+}
+```
+
+## Where this fits in the request lifecycle
+
+1. Request is parsed (`Request`).
+2. `integrate_api_pre_dispatch` hooks run (throttling, CORS preflight).
+3. Authentication runs: first all `integrate_api_authenticate` handlers, then the native API-key check if `$idMember` is still `null`.
+4. Router dispatches to the controller.
+
+## Native API-key sources (when no custom id is set)
+
+The built-in authenticator accepts the key from `Authorization: Bearer <key>`, the `X-API-Key` header, or the `api_key` request parameter. After authentication the full SMF user context is restored (`$user_info`, `allowedTo()`, `{query_see_board}`).
+
+## Tips
+
+- Resolve the token to an integer member id only when you can validate it; leave `$idMember` as `null` to fall through.
+- Do not set an id for an inactive or banned account — the core check will still reject it.
+- Keep the handler fast; it runs on every API request.

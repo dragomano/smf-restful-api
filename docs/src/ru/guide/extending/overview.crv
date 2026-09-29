@@ -1,0 +1,33 @@
+---
+title: Расширение — Обзор и хуки
+description: Как сторонние моды расширяют API через интеграционные хуки SMF без правки файлов этого мода; таблица хуков и принципы.
+order: 1
+---
+
+{#Extending-SMF-RESTful-API-Overview-Hooks}
+# Расширение SMF RESTful API — Обзор и хуки
+
+API спроектирован так, чтобы сторонние моды могли добавлять свои ресурсы и влиять на обработку запросов через стандартные интеграционные хуки SMF — не изменяя файлы этого мода.
+
+{#Available-hooks}
+## Доступные хуки
+
+{header-rows=0}
+|= *`integrate_api_routes`* (`Router $router`) | < |
+| Регистрация своих эндпоинтов | Вызывается при инициализации маршрутизатора |
+|= *`integrate_api_pre_dispatch`* (`Request $request`) | < |
+| Глобальная логика (throttle, CORS-preflight); может бросить `ApiException` | Вызывается после разбора запроса, до аутентификации |
+|= *`integrate_api_authenticate`* (`Request $request`, `?int &$idMember`) | < |
+| Свои схемы (OAuth/JWT): выставьте `$idMember` | Вызывается в начале аутентификации |
+|= *`integrate_api_pre_send`* (`array &$payload`, `int &$status`, `array &$headers`) | < |
+| Правка тела, статуса и заголовков (CORS, rate-limit, обёртки) | Вызывается перед выводом ответа |
+
+{#Where-hooks-come-from}
+## Откуда берутся хуки
+
+Все четыре хука — стандартные `integrate_*` хуки SMF, регистрируемые через `add_integration_function()`. Метод `Integration::hooks()` вашего мода регистрирует их так же, как это делает сам SMF — см. [Добавление ресурса](/ru/guide/extending/adding-resource).
+
+{#Version-prefix-and-route-style}
+## Префикс версии и стиль маршрутов
+
+Маршруты регистрируются *без* префикса версии. Ведущий сегмент версии (`v1`) снимает и проверяет сам `Router`, поэтому паттерны остаются версия-агностичными. Клиент обращается к ресурсу как `index.php?action=api&path=v1/widgets`. См. [Добавление ресурса](/ru/guide/extending/adding-resource) про вложенные коллекции и зарезервированные имена параметров.

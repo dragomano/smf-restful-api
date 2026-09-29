@@ -1,0 +1,34 @@
+---
+title: Clean URLs
+description: Optional rewrite rules for short /api/* URLs on Apache and Nginx; the direct index.php?action=api;path=... address always works.
+order: 2
+---
+
+# Clean URLs (rewrite rules)
+
+Rewrite rules are optional: the API is always reachable at its "direct" address, `index.php?action=api;path=v1/members/5`. The rules merely turn it into the short `/api/v1/members/5`. The mod strips the leading `api` segment itself, so the request ends up at `index.php?action=api` with the path in the `path` parameter; the remaining query parameters (for example, `?limit=25&offset=50`) are preserved.
+
+## Apache (.htaccess in the forum root)
+
+```apache ".htaccess"
+RewriteEngine On
+# /api/v1/members/5  ->  index.php?action=api;path=v1/members/5
+RewriteRule ^api/(.*)$ index.php?action=api;path=$1 [QSA,L]
+```
+
+The `QSA` flag appends the original query string, so filters and pagination keep working. If the forum is installed in a subdirectory, add a `RewriteBase` before the rule — for example, `RewriteBase /forum/`.
+
+## Nginx
+
+```nginx "nginx.conf"
+# /api/v1/members/5  ->  index.php?action=api;path=v1/members/5
+location ^~ /api/ {
+    rewrite ^/api/(.*)$ /index.php?action=api;path=$1 last;
+}
+```
+
+The `^~` modifier gives this block priority over the general `location ~ \.php$` (the order in which they are declared does not matter), and `/index.php` is then handled by the forum's usual PHP location. Nginx automatically appends the original query parameters to the `rewrite` target.
+
+::: tip "Direct address always works"
+You can skip rewrite rules entirely and use `index.php?action=api;path=v1/members/5` (or `index.php?action=api&path=v1/members/5` depending on your separator style).
+:::

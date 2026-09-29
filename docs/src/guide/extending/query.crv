@@ -1,0 +1,58 @@
+---
+title: Query & Controller
+description: Query fluent builder, fetch modes (paginate/first/exists/fetchAll), and the full AbstractController helper surface including writable, boolean, and transform.
+order: 3
+---
+
+# Query — Building and Running Queries
+
+`SMF\API\Query` is a small fluent builder. FROM/WHERE is written once and reused by every fetch mode; `LIMIT`, `COUNT`, and pagination are added automatically.
+
+## Building a query
+
+- `->from()` (with JOINs)
+- `->where()`
+- `->columns()`
+- `->orderBy()`
+- `->params()` (the `{int:...}`, `{query_see_board}`, etc. placeholders)
+
+## Running via the controller helpers
+
+- `$this->paginate($query)` — a collection with pagination meta; every row passes through `transform()`.
+- `$this->first($query)` — a single row or `null` (for `show` and checks).
+- `$this->exists($query)` — a `bool` (for validation in `store`).
+- `$this->fetchAll($query)` — all rows without pagination (raw arrays).
+
+## What's available in the controller
+
+- `$this->request` — the `Request` object (method, segments, query, body, headers).
+- `$this->response()` — a new `Response` (`->data()`, `->collection()`, `->status()`, `->header()`, `->error()`).
+- `$this->paginate($query)` / `$this->first($query)` / `$this->exists($query)` / `$this->fetchAll($query)` — run a `Query`.
+- `$this->transform($row)` — the output shape of a row; override it for your own resource (by default it returns the row as is).
+- `$this->id($params)` — the integer `{id}`, validated.
+- `$this->pagination()` — `[limit, offset]` with sensible bounds (called inside `paginate()`).
+- `$this->cleanString($value)` — a safe string from the request body.
+- `$this->writable($fields, $full)` — collect writable fields from the body: with `$full = true` (PUT) it requires every field in `$fields`, with `false` (PATCH) it keeps only the ones sent (an empty PATCH → 400).
+- `$this->boolean($value)` — coerce a body value to `bool` (accepts `true/false`, `1/0`, `"yes"/"no"`, `"on"/"off"`).
+- `$this->noContent()` — an empty `204` response for successful operations without a body (usually `DELETE`).
+- identity and permissions come from the global `$user_info` (set up by the `Authenticator`), and checks use the native `allowedTo()` / `$user_info['is_admin']`.
+
+::: warning "Writes go through SMF native functions"
+For mutating actions (`PUT` / `PATCH` / `DELETE`), perform the write through SMF's native functions (`modifyBoard`, `deleteMembers`, `modifyPost`, and so on) — `Query` is read-only. *Check permissions yourself* with `allowedTo()` before calling these functions and throw an `ApiException`: on denial, many core functions terminate the request with a fatal HTML error rather than JSON.
+:::
+
+## Example: transform shape
+
+Override `transform()` to define the outward shape of your resource — `paginate()` calls it for every row:
+
+```php "transform"
+protected function transform(array $row): array
+{
+	return [
+		'id'   => (int) $row['id_widget'],
+		'name' => $row['name'],
+	];
+}
+```
+
+See also [Adding a Resource](/guide/extending/adding-resource) for the full controller example.
